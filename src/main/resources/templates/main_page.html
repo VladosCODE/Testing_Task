@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Телефонная книга</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+</head>
+<body>
+<script type="text/javascript">
+    var id_for_function = {data: ''};
+    var name_cancel;
+    var number_cancel;
+    function update_form(id) {
+        id_for_function.data = id;
+        let tr = document.getElementById(id);
+        let td = tr.querySelectorAll('td');
+        var name=td[0].textContent;
+        var number=td[1].textContent;
+        document.getElementById('update').style.display = 'block';
+        document.getElementById('name').value = name;
+        document.getElementById('number').value = number;
+        name_cancel = $('#name').val();
+        number_cancel = $('#number').val();
+    }
+    function cancel_submit(){
+            event.preventDefault();
+            const date = new Date().toLocaleDateString();
+            var id = parseInt(id_for_function.data);
+            var name1 = name_cancel;
+            var number1 = number_cancel;
+            $.ajax({
+                url: 'http://localhost:8080/phoneBook/update?id='+id,
+                type: 'POST',
+                headers:{"Content-Type": "application/json"},
+                dataType: "json",
+                data: JSON.stringify({
+                    name:name1,
+                    number:number1,
+                    date: date
+                }),
+                success : function (data){
+                    const id = parseInt(data);
+                    let tr = document.getElementById(id);
+                    let td = tr.querySelectorAll('td');
+                    td[0].textContent = name_cancel;
+                    td[1].textContent = number_cancel;
+                    td[2].textContent = date;
+                    document.getElementById('update').style.display = 'none';
+                },
+                error: function (data){
+                    alert("Error");
+                }
+            });
+    }
+    function update_submit(){
+            event.preventDefault();
+            var name_new = $('#name').val();
+            var number_new = $('#number').val();
+            var date = new Date().toLocaleDateString();
+            var id_old=parseInt(id_for_function.data);
+            $.ajax({
+                url: 'http://localhost:8080/phoneBook/update?id='+id_old,
+                type: 'POST',
+                headers:{"Content-Type": "application/json"},
+                dataType: "json",
+                data: JSON.stringify({
+                    name:name_new,
+                    number:number_new,
+                    date:date
+                }),
+                success : function (data){
+                    const id = parseInt(data);
+                    let tr = document.getElementById(id);
+                    let td = tr.querySelectorAll('td');
+                    td[0].textContent = name_new;
+                    td[1].textContent = number_new;
+                    td[2].textContent = date;
+                },
+                error: function (data){
+                    alert(data.responseText);
+                }
+            });
+    }
+    function check(id){
+        const id_del=id;
+        $.ajax({
+            url: 'http://localhost:8080/phoneBook/delete',
+            type: 'POST',
+            data: {"id": id_del},
+            success : function (id){
+                document.getElementById(id).remove();
+            },
+            error: function (data){
+                alert("Error");
+            }
+        });
+    }
+    function create_person(){
+        document.getElementById('create').style.display = 'block';
+    }
+</script>
+<script type="text/javascript">
+    function save() {
+        event.preventDefault();
+        const name1 = $('#name_c').val();
+        const number1 = $('#number_c').val();
+        const date1 = new Date().toLocaleDateString();
+        $.ajax({
+            url: 'http://localhost:8080/phoneBook/create',
+            type: 'POST',
+            headers:{"Content-Type": "application/json"},
+            dataType: "json",
+            data: JSON.stringify({
+                name:name1,
+                number:number1,
+                date: date1
+            }),
+            success : function (data){
+                const id = parseInt(data);
+                    $('#table').append("<tr id='" + id + "'><td>" + name1 + "</td><td>" + number1 + "</td>" +
+                        "<td>" + date1 + "</td><td><button onclick='update_form(" + id + ")'>Изменить запись" +
+                        "</button></td><td>" +
+                        "<button onclick='check(" + id + ")'>Удалить запись</button></td></tr>");
+                    document.getElementById('create').style.display = 'none';
+            },
+            error: function (data){
+                alert(data.responseText);
+            }
+        });
+    }
+</script>
+<table id="table">
+    <tr>
+        <th>Имя</th>
+        <th>Телефон</th>
+        <th>Дата</th>
+        <th>Изменение</th>
+        <th>Удаление</th>
+    </tr>
+    <div th:each="person: ${persons}">
+        <tr th:id="${person.getId()}">
+            <td th:text="${person.getName()}"></td>
+            <td th:text="${person.getNumber()}"></td>
+            <td th:text="${person.getDate()}"></td>
+            <td>
+                <button th:data-name="${person.getName()}" th:data-number="${person.getNumber()}"
+                        th:data-id="${person.getId()}"
+                        onclick="update_form(this.getAttribute('data-id'))">Изменить запись</button>
+            </td>
+            <td>
+                <button th:data-id="${person.getId()}"  onclick="check(this.getAttribute('data-id'))">Удалить запись</button>
+            </td>
+        </tr>
+    </div>
+</table>
+</br>
+            <div id="update" style="display: none">
+                <h3>Изменения записей</h3>
+                <form name="update" method="POST" action="/phoneBook/update">
+                    <label for="name">Enter name: </label>
+                    <input type="text" id="name" name="name"/>
+                    </br>
+                    <label for="number">Enter number: </label>
+                    <input type="text" id="number" name="number"/>
+                    </br>
+                    <input type="submit" onclick="update_submit()" value="Обновить запись"/>
+                    </br>
+                </form>
+                <button id="cancel" onclick="cancel_submit()">Отмена изменений</button>
+            </div>
+</br>
+</br>
+        <button onclick="create_person()" >Добавить запись</button>
+            <div id="create" style="display: none">
+                <h3>Создание записи</h3>
+                <form id="form" method="post" action="/phoneBook/create">
+                    <label for="name_c">Enter name: </label>
+                    <input type="text" id="name_c" name="name_c"/>
+                    </br>
+                    <label for="number_c">Enter number: </label>
+                    <input type="text" id="number_c" name="number_c"/>
+                    </br>
+                    <input type="submit" onclick="save()" value="Добавить запись"/>
+                </form>
+            </div>
+</body>
+</html>
