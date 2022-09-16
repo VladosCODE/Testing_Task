@@ -7,27 +7,24 @@
 </head>
 <body>
 <script type="text/javascript">
-    var id_for_function = {data: ''};
-    var name_cancel;
-    var number_cancel;
-    function update_form(id) {
-        id_for_function.data = id;
+    function update_form(id){
         let tr = document.getElementById(id);
         let td = tr.querySelectorAll('td');
-        var name=td[0].textContent;
-        var number=td[1].textContent;
+        const name=td[0].textContent;
+        const number=td[1].textContent;
         document.getElementById('update').style.display = 'block';
         document.getElementById('name').value = name;
         document.getElementById('number').value = number;
-        name_cancel = $('#name').val();
-        number_cancel = $('#number').val();
+        document.getElementById('cancel').setAttribute('name',name);
+        document.getElementById('cancel').setAttribute('number_phone',number);
+        document.getElementById('update_btn').setAttribute('id_old',id);
     }
     function cancel_submit(){
             event.preventDefault();
             const date = new Date().toLocaleDateString();
-            var id = parseInt(id_for_function.data);
-            var name1 = name_cancel;
-            var number1 = number_cancel;
+            var id = parseInt(document.getElementById('update_btn').getAttribute('id_old'));
+            var name1 = document.getElementById('cancel').getAttribute('name');
+            var number1 = document.getElementById('cancel').getAttribute('number_phone');
             $.ajax({
                 url: 'http://localhost:8080/phoneBook/update?id='+id,
                 type: 'POST',
@@ -39,12 +36,11 @@
                     date: date
                 }),
                 success : function (data){
-                    const id = parseInt(data);
-                    let tr = document.getElementById(id);
+                    let tr = document.getElementById(data['id']);
                     let td = tr.querySelectorAll('td');
-                    td[0].textContent = name_cancel;
-                    td[1].textContent = number_cancel;
-                    td[2].textContent = date;
+                    td[0].textContent = data['name'];
+                    td[1].textContent = data['number'];
+                    td[2].textContent = data['date'];
                     document.getElementById('update').style.display = 'none';
                 },
                 error: function (data){
@@ -57,7 +53,7 @@
             var name_new = $('#name').val();
             var number_new = $('#number').val();
             var date = new Date().toLocaleDateString();
-            var id_old=parseInt(id_for_function.data);
+            var id_old=parseInt(document.getElementById('update_btn').getAttribute('id_old'));
             $.ajax({
                 url: 'http://localhost:8080/phoneBook/update?id='+id_old,
                 type: 'POST',
@@ -69,15 +65,14 @@
                     date:date
                 }),
                 success : function (data){
-                    const id = parseInt(data);
-                    let tr = document.getElementById(id);
+                    let tr = document.getElementById(data['id']);
                     let td = tr.querySelectorAll('td');
-                    td[0].textContent = name_new;
-                    td[1].textContent = number_new;
-                    td[2].textContent = date;
+                    td[0].textContent = data['name'];
+                    td[1].textContent = data['number'];
+                    td[2].textContent = data['date'];
                 },
                 error: function (data){
-                    alert(data.responseText);
+                    alert("error");
                 }
             });
     }
@@ -89,6 +84,8 @@
             data: {"id": id_del},
             success : function (id){
                 document.getElementById(id).remove();
+                document.getElementById('cancel_delete').style.display = 'block';
+                document.getElementById('btn_cancel_delete').setAttribute('id_for_cancel',id);
             },
             error: function (data){
                 alert("Error");
@@ -116,17 +113,51 @@
                 date: date1
             }),
             success : function (data){
-                const id = parseInt(data);
-                    $('#table').append("<tr id='" + id + "'><td>" + name1 + "</td><td>" + number1 + "</td>" +
-                        "<td>" + date1 + "</td><td><button onclick='update_form(" + id + ")'>Изменить запись" +
-                        "</button></td><td>" +
-                        "<button onclick='check(" + id + ")'>Удалить запись</button></td></tr>");
+                $('#table').append("<tr id='" + data['id'] + "'><td>" + data['name'] + "</td><td>" + data['number']
+                    + "</td>" +
+                    "<td>" + data['date'] + "</td><td><button onclick='update_form(" + data['id'] + ")'>Изменить запись" +
+                    "</button></td><td>" +
+                    "<button onclick='check(" + data['id'] + ")'>Удалить запись</button></td></tr>");
                     document.getElementById('create').style.display = 'none';
             },
             error: function (data){
-                alert(data.responseText);
+                alert("error");
             }
         });
+    }
+    function cancel_delete(id){
+        const id_cancel_del=id;
+        $.ajax({
+            url: 'http://localhost:8080/phoneBook/delete/cancel?id='+id_cancel_del,
+            type: 'POST',
+            success: function (data){
+                $('#table').append("<tr id='" + data['id'] + "'><td>" + data['name'] + "</td><td>" + data['number']
+                    + "</td>" +
+                    "<td>" + data['date'] + "</td><td><button onclick='update_form(" + data['id'] + ")'>Изменить запись" +
+                    "</button></td><td>" +
+                    "<button onclick='check(" + data['id'] + ")'>Удалить запись</button></td></tr>");
+                document.getElementById('cancel_delete').style.display = 'none';
+            },
+            error: function (data){
+                alert("error");
+            }
+        })
+    }
+    function update_all_name(){
+        event.preventDefault();
+        var worker = new Worker('./Worker_update_date.js');
+        const name = $('#new_name').val();
+        worker.postMessage(name);
+        worker.onmessage = function (response){
+            console.log(JSON.parse(response));
+            var tr = document.getElementById("table").getElementsByTagName('tr');
+            for (var i = 1 ;i< tr.length; i++) {
+                tr[i].getElementsByTagName('td')[0].textContent = name;
+                }
+            }
+        worker.onerror = function (e){
+            alert("Error");
+        }
     }
 </script>
 <table id="table">
@@ -163,13 +194,17 @@
                     <label for="number">Enter number: </label>
                     <input type="text" id="number" name="number"/>
                     </br>
-                    <input type="submit" onclick="update_submit()" value="Обновить запись"/>
+                    <input type="submit" onclick="update_submit()" value="Обновить запись" id="update_btn"/>
                     </br>
                 </form>
                 <button id="cancel" onclick="cancel_submit()">Отмена изменений</button>
             </div>
 </br>
 </br>
+        <div id="cancel_delete" style="display: none">
+            <h3>Отменить последнее удаление</h3>
+            <button id="btn_cancel_delete" onclick="cancel_delete(this.getAttribute('id_for_cancel'))">Отменить</button>
+        </div>
         <button onclick="create_person()" >Добавить запись</button>
             <div id="create" style="display: none">
                 <h3>Создание записи</h3>
@@ -183,5 +218,14 @@
                     <input type="submit" onclick="save()" value="Добавить запись"/>
                 </form>
             </div>
+
+        <h3>Замена имени у всех записей</h3>
+        <form method="post" action="/phoneBook/updateAllRecords">
+            <label for="new_name">Enter number: </label>
+            <input type="text" id="new_name" name="new_name"/>
+            </br>
+            <input type="submit" onclick="update_all_name()" value="Заменить"/>
+        </form>
+
 </body>
 </html>

@@ -1,5 +1,6 @@
 package ru.Vladislav.testing_task.Controllers;
 
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -8,7 +9,9 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
 import ru.Vladislav.testing_task.models.Person;
+import ru.Vladislav.testing_task.models.PersonDTO;
 import ru.Vladislav.testing_task.services.ServicesPerson;
 import ru.Vladislav.testing_task.util.PersonNotCreatedException;
 
@@ -16,45 +19,59 @@ import javax.validation.Valid;
 import java.util.List;
 
 @RequestMapping("/phoneBook")
-@Controller
+@RestController
 public class ControllerPerson {
     private ServicesPerson servicesPerson;
+    private ModelMapper modelMapper;
 
     @Autowired
-    public ControllerPerson(ServicesPerson servicesPerson) {
+    public ControllerPerson(ServicesPerson servicesPerson, ModelMapper modelMapper) {
         this.servicesPerson = servicesPerson;
+        this.modelMapper = modelMapper;
     }
 
     @GetMapping("")
-    public String showPersons(Model model){
-        model.addAttribute("persons",servicesPerson.findAll());
-        return "main_page";
+    public ModelAndView showPersons(Model model){
+        ModelAndView modelAndView = new ModelAndView();
+        modelAndView.addObject("persons",servicesPerson.findAll());
+        modelAndView.setViewName("main_page");
+        return modelAndView;
     }
     @PostMapping(path="/update",consumes = "application/json")
-    @ResponseBody
-    public ResponseEntity<Integer> updatePerson(@RequestBody @Valid Person person,BindingResult bindingResult,@RequestParam("id") int id){
+    public Person updatePerson(@RequestBody @Valid PersonDTO personDTO,BindingResult bindingResult,
+                                                @RequestParam("id") int id){
+        Person person = convertToPerson(personDTO);
         check_exception(bindingResult);
         servicesPerson.update(id,person);
-        return new ResponseEntity<>(person.getId(), HttpStatus.OK);
+        return person;
     }
     @PostMapping(path = "/delete")
-    @ResponseBody
     public int deletePerson(@RequestParam Integer id){
         servicesPerson.delete(id);
         return id;
     }
+    @PostMapping(path="/delete/cancel")
+    public Person cancel_delete(@RequestParam("id") int id){
+        Person person = servicesPerson.cancel_delete(id);
+        return person;
+    }
 
     @PostMapping(path = "/create",consumes = "application/json")
-    @ResponseBody
-    public ResponseEntity<Integer> createPerson(@RequestBody @Valid Person person, BindingResult bindingResult){
+    public Person createPerson(@RequestBody @Valid PersonDTO personDTO, BindingResult bindingResult){
+        Person person = convertToPerson(personDTO);
         check_exception(bindingResult);
         servicesPerson.save(person);
-        return new ResponseEntity<>(person.getId(), HttpStatus.OK);
+        return person;
+    }
+
+    @PostMapping(path="/updateAllRecords")
+    public String update_all_name(@RequestParam(value = "name") String name){
+        servicesPerson.update_date(name);
+        return name;
     }
 
     @ExceptionHandler
     private ResponseEntity handleException(PersonNotCreatedException e){
-        System.out.println(e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
     private void check_exception(BindingResult bindingResult){
@@ -68,5 +85,8 @@ public class ControllerPerson {
             }
             throw new PersonNotCreatedException(errorMsg.toString());
         }
+    }
+    private Person convertToPerson(PersonDTO personDTO){
+        return modelMapper.map(personDTO,Person.class);
     }
 }
